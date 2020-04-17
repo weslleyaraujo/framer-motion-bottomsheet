@@ -1,16 +1,52 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Sheet } from "./Sheet";
+import { useReducedMotion } from "framer-motion";
 
 function App() {
+  const ref = useRef<React.ElementRef<typeof Sheet> | null>(null);
   return (
     <>
-      <Sheet snapPoints={[100]}>I am at the bottom</Sheet>
+      <Sheet ref={ref} snapPoints={[100]}>
+        <div
+          style={{
+            padding: 24,
+          }}
+        >
+          <h1>Hello World</h1>
+          <p>
+            aliquip ex ea commodo consequat. Duis aute irure dolor in
+            reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
+            pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
+            culpa qui officia deserunt mollit anim id est laborum." Section
+            1.10.32 of "de Finibus Bonorum et Malorum", written by Cicero in 45
+            BC "Sed ut perspiciatis unde omnis iste natus error sit voluptatem
+          </p>
+        </div>
+      </Sheet>
       <div
         style={{
           padding: 24,
         }}
       >
         <h1>The standard Lorem Ipsum passage, used since the 1500s</h1>
+        <button
+          onClick={() => {
+            if (ref.current) {
+              ref.current.close();
+            }
+          }}
+        >
+          close
+        </button>
+        <button
+          onClick={() => {
+            if (ref.current) {
+              ref.current.open();
+            }
+          }}
+        >
+          open
+        </button>
         <p>
           "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
           eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad

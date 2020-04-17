@@ -1,112 +1,18 @@
-import React, { useState, useMemo } from "react";
+import {
+  motion,
+  useAnimation,
+  useMotionValue,
+  useTransform,
+} from "framer-motion";
+import { transparentize } from "polished";
+import React, { useImperativeHandle } from "react";
 import "styled-components/macro";
-import { motion } from "framer-motion";
-
-type SnapValue =
-  | 1
-  | 2
-  | 3
-  | 4
-  | 5
-  | 6
-  | 7
-  | 8
-  | 9
-  | 10
-  | 11
-  | 12
-  | 13
-  | 14
-  | 15
-  | 16
-  | 17
-  | 18
-  | 19
-  | 20
-  | 21
-  | 22
-  | 23
-  | 24
-  | 25
-  | 26
-  | 27
-  | 28
-  | 29
-  | 30
-  | 31
-  | 32
-  | 33
-  | 34
-  | 35
-  | 36
-  | 37
-  | 38
-  | 39
-  | 40
-  | 41
-  | 42
-  | 43
-  | 44
-  | 45
-  | 46
-  | 47
-  | 48
-  | 49
-  | 50
-  | 51
-  | 52
-  | 53
-  | 54
-  | 55
-  | 56
-  | 57
-  | 58
-  | 59
-  | 60
-  | 61
-  | 62
-  | 63
-  | 64
-  | 65
-  | 66
-  | 67
-  | 68
-  | 69
-  | 70
-  | 71
-  | 72
-  | 73
-  | 74
-  | 75
-  | 76
-  | 77
-  | 78
-  | 79
-  | 80
-  | 81
-  | 82
-  | 83
-  | 84
-  | 85
-  | 86
-  | 87
-  | 88
-  | 89
-  | 90
-  | 91
-  | 92
-  | 93
-  | 94
-  | 95
-  | 96
-  | 97
-  | 98
-  | 99
-  | 100;
+import { SnapValues } from "./SnapValues";
+import { useDimensions } from "./use-dimensions";
 
 interface Props {
   children?: React.ReactNode;
-  snapPoints?: SnapValue[];
+  snapPoints?: SnapValues[];
 }
 
 interface DefaultProps extends Required<Pick<Props, "snapPoints">> {}
@@ -115,48 +21,75 @@ const defaultProps: DefaultProps = {
   snapPoints: [100],
 };
 
-function Sheet({ children, snapPoints }: Props & DefaultProps) {
-  const [visible, setVisible] = useState();
-  const points = useMemo(() => {
-    return snapPoints.map((item) => {
-      if (item > 100) {
-        throw new Error("snapPoints can only contain values between 0 and 100");
-      }
+interface SheetRef {
+  open: () => void;
+  close: () => void;
+}
 
-      return item;
-    });
-  }, [snapPoints]);
+const OVERLAY_OPACITY = 0.25;
+
+const Sheet = React.forwardRef<SheetRef, Props & DefaultProps>(function Sheet(
+  { children, snapPoints },
+  ref
+) {
+  const [sheetRef, dimensions] = useDimensions({
+    liveMeasure: true,
+  });
+  const height = Number(dimensions.height || 1);
+  const controls = useAnimation();
+  // first
+  // dimensions.height means close
+  // "100%" means close
+  // 0 means open
+
+  // second
+
+  const y = useMotionValue(height); // ??
+  const opacity = useTransform(y, [0, height], [1, 0]);
+  const backgroundColor = useTransform(opacity, (value) =>
+    transparentize(1 - value * (1 - OVERLAY_OPACITY), "black")
+  );
+
+  // @ts-ignore
+  window.transparentize = transparentize;
+
+  useImperativeHandle<{}, {}>(ref, () => ({
+    close: () => controls.start("hidden"),
+    open: () => controls.start("visible"),
+  }));
 
   return (
     <>
-      <button
-        style={{
-          position: "fixed",
-          backgroundColor: "red",
-          left: 0,
-          top: 40,
-        }}
-        onClick={() => setVisible(!visible)}
-      >
-        Toggle
-      </button>
       <motion.div
+        style={{
+          position: "absolute",
+          width: "100%",
+          height: "10vh",
+          outline: "1px solid red",
+          backgroundColor,
+        }}
+      />
+      <motion.div
+        ref={sheetRef}
         dragElastic
-        animate={visible ? "visible" : "hidden"}
-        onDragEnd={(event, { point, offset, velocity }) => {
-          console.log(event, point);
-        }}
-        variants={{
-          visible: {
-            y: "0",
-          },
-          hidden: {
-            y: "100%",
-          },
-        }}
+        dragPropagation={false}
         drag="y"
+        animate={controls}
+        variants={{
+          visible: { y: 0 },
+          hidden: { y: height },
+        }}
         dragConstraints={{
           top: 0,
+          bottom: 0,
+        }}
+        onDragEnd={(event, info) => {
+          const shouldClose =
+            info.velocity.y > 20 || (info.velocity.y >= 0 && info.point.y > 45);
+
+          if (shouldClose) {
+            controls.start("hidden");
+          }
         }}
         transition={{
           duration: 1,
@@ -183,20 +116,25 @@ function Sheet({ children, snapPoints }: Props & DefaultProps) {
           bottom: 0,
           position: "fixed",
           width: "100%",
-          minHeight: 24,
+          y,
           border: "0.5px solid #FFDFAB",
           borderBottom: "none",
-          padding: 24,
           backgroundColor: "papayawhip",
           boxShadow: "16px 0 0 0.5",
           borderRadius: "12px 12px 0 0",
         }}
       >
-        {children}
+        <div
+          style={{
+            overflow: "auto",
+          }}
+        >
+          {children}
+        </div>
       </motion.div>
     </>
   );
-}
+});
 
 Sheet.defaultProps = defaultProps;
 

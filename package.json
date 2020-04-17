@@ -12,6 +12,7 @@
     "@types/react-dom": "^16.9.0",
     "@types/styled-components": "^5.0.1",
     "framer-motion": "^1.10.3",
+    "polished": "^3.5.1",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
     "react-scripts": "3.4.1",
