@@ -1,6 +1,5 @@
 import React, { useRef } from "react";
 import { Sheet } from "./Sheet";
-import { useReducedMotion } from "framer-motion";
 
 function App() {
   const ref = useRef<React.ElementRef<typeof Sheet> | null>(null);

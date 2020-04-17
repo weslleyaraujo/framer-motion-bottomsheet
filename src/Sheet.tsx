@@ -5,7 +5,7 @@ import {
   useTransform,
 } from "framer-motion";
 import { transparentize } from "polished";
-import React, { useImperativeHandle } from "react";
+import React, { useEffect, useImperativeHandle, useState } from "react";
 import "styled-components/macro";
 import { SnapValues } from "./SnapValues";
 import { useDimensions } from "./use-dimensions";
@@ -27,6 +27,7 @@ interface SheetRef {
 }
 
 const OVERLAY_OPACITY = 0.25;
+const OVERLAY_COLOR = "#000";
 
 const Sheet = React.forwardRef<SheetRef, Props & DefaultProps>(function Sheet(
   { children, snapPoints },
@@ -37,21 +38,22 @@ const Sheet = React.forwardRef<SheetRef, Props & DefaultProps>(function Sheet(
   });
   const height = Number(dimensions.height || 1);
   const controls = useAnimation();
-  // first
-  // dimensions.height means close
-  // "100%" means close
-  // 0 means open
-
-  // second
-
   const y = useMotionValue(height); // ??
   const opacity = useTransform(y, [0, height], [1, 0]);
+  const [visible, setVisible] = useState(false);
   const backgroundColor = useTransform(opacity, (value) =>
-    transparentize(1 - value * (1 - OVERLAY_OPACITY), "black")
+    transparentize(1 - value * (1 - OVERLAY_OPACITY), OVERLAY_COLOR)
   );
 
-  // @ts-ignore
-  window.transparentize = transparentize;
+  useEffect(() => {
+    return opacity.onChange((value) => {
+      if (value === 0 && visible) {
+        setVisible(false);
+      } else if (!visible) {
+        setVisible(true);
+      }
+    });
+  }, [opacity, visible]);
 
   useImperativeHandle<{}, {}>(ref, () => ({
     close: () => controls.start("hidden"),
@@ -62,11 +64,17 @@ const Sheet = React.forwardRef<SheetRef, Props & DefaultProps>(function Sheet(
     <>
       <motion.div
         style={{
+          backgroundColor,
+        }}
+        css={{
+          display: !visible ? "none" : undefined,
           position: "absolute",
           width: "100%",
-          height: "10vh",
-          outline: "1px solid red",
-          backgroundColor,
+          height: "100%",
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
         }}
       />
       <motion.div
@@ -109,6 +117,8 @@ const Sheet = React.forwardRef<SheetRef, Props & DefaultProps>(function Sheet(
             bottom: 24 / 2,
             backgroundColor: "papayawhip",
             transform: "translateY(100%) translateZ(0px)",
+            borderRight: "0.5px solid #FFDFAB",
+            borderLeft: "0.5px solid #FFDFAB",
           },
         }}
         style={{
