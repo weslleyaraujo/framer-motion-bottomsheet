@@ -3,71 +3,86 @@ import {
   useAnimation,
   useMotionValue,
   useTransform,
+  Variant,
 } from "framer-motion";
 import { transparentize } from "polished";
-import React, { useEffect, useImperativeHandle, useState } from "react";
+import React, { useImperativeHandle } from "react";
 import "styled-components/macro";
-import { SnapValues } from "./SnapValues";
 import { useDimensions } from "./use-dimensions";
+
+type AnimationsVariants = "visible" | "hidden";
+
+const ANIMATIONS: { [key in AnimationsVariants]: string } = {
+  visible: "visible",
+  hidden: "hidden",
+};
 
 interface Props {
   children?: React.ReactNode;
-  snapPoints?: SnapValues[];
+  initial?: AnimationsVariants;
 }
 
-interface DefaultProps extends Required<Pick<Props, "snapPoints">> {}
-
-const defaultProps: DefaultProps = {
-  snapPoints: [100],
-};
-
+interface DefaultProps extends Required<Pick<Props, "initial">> {}
 interface SheetRef {
   open: () => void;
   close: () => void;
 }
 
-const OVERLAY_OPACITY = 0.25;
-const OVERLAY_COLOR = "#000";
+const theme = {
+  unit: {
+    large: 24,
+  },
+  color: {
+    background: "white",
+  },
+  constants: {
+    overlayColor: "#000",
+    overlayOpacity: 0.25,
+    radius: 12,
+  },
+};
 
-const Sheet = React.forwardRef<SheetRef, Props & DefaultProps>(function Sheet(
-  { children, snapPoints },
-  ref
-) {
+const defaultProps: DefaultProps = {
+  initial: "hidden",
+};
+
+const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
+  const { initial, children } = { ...defaultProps, ...props };
   const [sheetRef, dimensions] = useDimensions({
     liveMeasure: true,
   });
-  const height = Number(dimensions.height || 1);
+  const height = Number(dimensions.height || 0);
   const controls = useAnimation();
-  const y = useMotionValue(height); // ??
+  const y = useMotionValue(0);
   const opacity = useTransform(y, [0, height], [1, 0]);
-  const [visible, setVisible] = useState(false);
+  const display = useTransform(opacity, (value) =>
+    value === 0 ? "none" : "initial"
+  );
   const backgroundColor = useTransform(opacity, (value) =>
-    transparentize(1 - value * (1 - OVERLAY_OPACITY), OVERLAY_COLOR)
+    transparentize(
+      1 - value * (1 - theme.constants.overlayOpacity),
+      theme.constants.overlayColor
+    )
   );
 
-  useEffect(() => {
-    return opacity.onChange((value) => {
-      if (value === 0 && visible) {
-        setVisible(false);
-      } else if (!visible) {
-        setVisible(true);
-      }
-    });
-  }, [opacity, visible]);
-
   useImperativeHandle<{}, {}>(ref, () => ({
-    close: () => controls.start("hidden"),
-    open: () => controls.start("visible"),
+    close: () => controls.start(ANIMATIONS.hidden),
+    open: () => controls.start(ANIMATIONS.visible),
   }));
+
+  const variants: { [key in AnimationsVariants]: Variant } = {
+    visible: { y: 0 },
+    hidden: { y: height > 0 ? height : "100%" },
+  };
 
   return (
     <>
       <motion.div
         style={{
           backgroundColor,
+          display,
         }}
         css={{
-          display: !visible ? "none" : undefined,
           position: "absolute",
           width: "100%",
           height: "100%",
@@ -79,24 +94,22 @@ const Sheet = React.forwardRef<SheetRef, Props & DefaultProps>(function Sheet(
       />
       <motion.div
         ref={sheetRef}
+        drag="y"
         dragElastic
         dragPropagation={false}
-        drag="y"
         animate={controls}
-        variants={{
-          visible: { y: 0 },
-          hidden: { y: height },
-        }}
+        initial={initial}
+        variants={variants}
         dragConstraints={{
           top: 0,
           bottom: 0,
         }}
         onDragEnd={(event, info) => {
-          const shouldClose =
-            info.velocity.y > 20 || (info.velocity.y >= 0 && info.point.y > 45);
-
-          if (shouldClose) {
-            controls.start("hidden");
+          if (
+            info.velocity.y > 20 ||
+            (info.velocity.y >= 0 && info.point.y > 45)
+          ) {
+            controls.start(ANIMATIONS.hidden);
           }
         }}
         transition={{
@@ -114,24 +127,21 @@ const Sheet = React.forwardRef<SheetRef, Props & DefaultProps>(function Sheet(
             height: "100vh",
             width: "100%",
             left: 0,
-            bottom: 24 / 2,
-            backgroundColor: "papayawhip",
+            bottom: theme.unit.large / 2,
+            backgroundColor: theme.color.background,
             transform: "translateY(100%) translateZ(0px)",
-            borderRight: "0.5px solid #FFDFAB",
-            borderLeft: "0.5px solid #FFDFAB",
           },
         }}
         style={{
+          y,
           left: 0,
           bottom: 0,
           position: "fixed",
           width: "100%",
-          y,
-          border: "0.5px solid #FFDFAB",
           borderBottom: "none",
-          backgroundColor: "papayawhip",
+          backgroundColor: theme.color.background,
           boxShadow: "16px 0 0 0.5",
-          borderRadius: "12px 12px 0 0",
+          borderRadius: theme.constants.radius,
         }}
       >
         <div

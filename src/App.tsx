@@ -5,7 +5,7 @@ function App() {
   const ref = useRef<React.ElementRef<typeof Sheet> | null>(null);
   return (
     <>
-      <Sheet ref={ref} snapPoints={[100]}>
+      <Sheet ref={ref} initial="visible">
         <div
           style={{
             padding: 24,
