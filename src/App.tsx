@@ -5,7 +5,12 @@ function App() {
   const ref = useRef<React.ElementRef<typeof Sheet> | null>(null);
   return (
     <>
-      <Sheet ref={ref} initial="visible">
+      <Sheet
+        ref={ref}
+        initial="visible"
+        onOpenTransitionEnd={() => console.log("open")}
+        onCloseTransitionEnd={() => console.log("close")}
+      >
         <div
           style={{
             padding: 24,
@@ -28,24 +33,8 @@ function App() {
         }}
       >
         <h1>The standard Lorem Ipsum passage, used since the 1500s</h1>
-        <button
-          onClick={() => {
-            if (ref.current) {
-              ref.current.close();
-            }
-          }}
-        >
-          close
-        </button>
-        <button
-          onClick={() => {
-            if (ref.current) {
-              ref.current.open();
-            }
-          }}
-        >
-          open
-        </button>
+        <button onClick={() => ref.current?.close()}>close</button>
+        <button onClick={() => ref.current?.open()}>open</button>
         <p>
           "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
           eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad

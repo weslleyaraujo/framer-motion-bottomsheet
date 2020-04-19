@@ -20,9 +20,23 @@ const ANIMATIONS: { [key in AnimationsVariants]: string } = {
 interface Props {
   children?: React.ReactNode;
   initial?: AnimationsVariants;
+  draggable?: boolean;
+
+  /** Callback called when the opening animation is completed. */
+  onOpenTransitionEnd?: () => void;
+
+  /** Callback called when the closing animation is completed. */
+  onCloseTransitionEnd?: () => void;
 }
 
-interface DefaultProps extends Required<Pick<Props, "initial">> {}
+interface DefaultProps
+  extends Required<
+    Pick<
+      Props,
+      "initial" | "draggable" | "onCloseTransitionEnd" | "onOpenTransitionEnd"
+    >
+  > {}
+
 interface SheetRef {
   open: () => void;
   close: () => void;
@@ -44,10 +58,19 @@ const theme = {
 
 const defaultProps: DefaultProps = {
   initial: "hidden",
+  draggable: true,
+  onCloseTransitionEnd: () => {},
+  onOpenTransitionEnd: () => {},
 };
 
 const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
-  const { initial, children } = { ...defaultProps, ...props };
+  const {
+    initial,
+    children,
+    draggable,
+    onCloseTransitionEnd,
+    onOpenTransitionEnd,
+  } = { ...defaultProps, ...props };
   const [sheetRef, dimensions] = useDimensions({
     liveMeasure: true,
   });
@@ -56,7 +79,7 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
   const y = useMotionValue(0);
   const opacity = useTransform(y, [0, height], [1, 0]);
   const display = useTransform(opacity, (value) =>
-    value === 0 ? "none" : "initial"
+    Number.isNaN(value) || value === 0 ? "none" : "initial"
   );
   const backgroundColor = useTransform(opacity, (value) =>
     transparentize(
@@ -72,12 +95,16 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
 
   const variants: { [key in AnimationsVariants]: Variant } = {
     visible: { y: 0 },
-    hidden: { y: height > 0 ? height : "100%" },
+    hidden: { y: "100%" },
   };
 
   return (
     <>
       <motion.div
+        onClick={(event) => {
+          event.preventDefault();
+          controls.start(ANIMATIONS.hidden);
+        }}
         style={{
           backgroundColor,
           display,
@@ -94,15 +121,25 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
       />
       <motion.div
         ref={sheetRef}
-        drag="y"
-        dragElastic
-        dragPropagation={false}
+        {...(draggable && {
+          drag: "y",
+          dragElastic: true,
+          dragPropagation: false,
+        })}
         animate={controls}
         initial={initial}
         variants={variants}
         dragConstraints={{
           top: 0,
           bottom: 0,
+        }}
+        onAnimationComplete={() => {
+          if (y.get() === 0) {
+            onOpenTransitionEnd();
+            return;
+          }
+
+          onCloseTransitionEnd();
         }}
         onDragEnd={(event, info) => {
           if (
@@ -113,11 +150,10 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
           }
         }}
         transition={{
-          duration: 1,
           y: {
             type: "spring",
-            stiffness: 200,
-            damping: 15,
+            stiffness: 180,
+            damping: 14,
           },
         }}
         css={{
