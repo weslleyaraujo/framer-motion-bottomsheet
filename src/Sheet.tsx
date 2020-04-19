@@ -6,7 +6,7 @@ import {
   Variant,
 } from "framer-motion";
 import { transparentize } from "polished";
-import React, { useImperativeHandle } from "react";
+import React, { useImperativeHandle, useEffect, useRef } from "react";
 import "styled-components/macro";
 import { useDimensions } from "./use-dimensions";
 
@@ -21,6 +21,7 @@ interface Props {
   children?: React.ReactNode;
   initial?: AnimationsVariants;
   draggable?: boolean;
+  animateOnMount?: boolean;
 
   /** Callback called when the opening animation is completed. */
   onOpenTransitionEnd?: () => void;
@@ -65,12 +66,14 @@ const defaultProps: DefaultProps = {
 
 const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
   const {
-    initial,
+    initial: rawInitial,
     children,
     draggable,
     onCloseTransitionEnd,
     onOpenTransitionEnd,
+    animateOnMount,
   } = { ...defaultProps, ...props };
+  const firstPaint = useRef(false);
   const [sheetRef, dimensions] = useDimensions({
     liveMeasure: true,
   });
@@ -97,6 +100,18 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
     visible: { y: 0 },
     hidden: { y: "100%" },
   };
+
+  const initial =
+    animateOnMount && !firstPaint.current && rawInitial === "visible"
+      ? ANIMATIONS.hidden
+      : rawInitial;
+
+  useEffect(() => {
+    if (animateOnMount && !firstPaint.current) {
+      firstPaint.current = true;
+      controls.start(ANIMATIONS.visible);
+    }
+  });
 
   return (
     <>

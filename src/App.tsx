@@ -8,6 +8,7 @@ function App() {
       <Sheet
         ref={ref}
         initial="visible"
+        animateOnMount
         onOpenTransitionEnd={() => console.log("open")}
         onCloseTransitionEnd={() => console.log("close")}
       >
