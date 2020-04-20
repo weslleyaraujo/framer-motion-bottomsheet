@@ -132,6 +132,7 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
           right: 0,
           top: 0,
           bottom: 0,
+          zIndex: 10, // TODO: take care of zIndexes
         }}
       />
       <motion.div
@@ -187,6 +188,7 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
           y,
           left: 0,
           bottom: 0,
+          zIndex: 11, // TODO: Take care of zIndexes
           position: "fixed",
           width: "100%",
           borderBottom: "none",
@@ -197,7 +199,7 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
       >
         <div
           style={{
-            overflow: "auto",
+            overflow: "scroll",
           }}
         >
           {children}
