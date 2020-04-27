@@ -8,7 +8,7 @@ import {
 import { transparentize } from "polished";
 import React, { useImperativeHandle, useEffect, useRef } from "react";
 import "styled-components/macro";
-import { useDimensions } from "./use-dimensions";
+import useDimensions from "react-use-dimensions";
 
 type AnimationsVariants = "visible" | "hidden";
 
