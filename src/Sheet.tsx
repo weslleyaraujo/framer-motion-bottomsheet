@@ -74,18 +74,21 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
     animateOnMount,
   } = { ...defaultProps, ...props };
   const firstPaint = useRef(false);
-  const [fullScroll, setFullScroll] = useState(false);
+  const [contentScrollY, setContentScrollY] = useState<
+    "top" | "bottom" | "ongoing"
+  >("top");
+  const [isDragAllowed, setDragAllowed] = useState(true); // TODO: false
   const [sheetRef, sheetDimensions] = useDimensions({
     liveMeasure: true,
   });
-  const [contentRef, contentDimensions] = useDimensions({
-    liveMeasure: true,
-  });
-  const foo = useRef({
+
+  const contentRef = useRef(null);
+  const contentScrollRef = useRef({
     scrollTop: 0,
     scrollHeight: 0,
-    value: 0,
+    fullScrollHeight: 0,
   });
+
   const height = Number(sheetDimensions.height || 0);
   const controls = useAnimation();
   const y = useMotionValue(0);
@@ -122,6 +125,14 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
     }
   });
 
+  useEffect(() => {
+    if (["top", "bottom"].includes(contentScrollY)) {
+      setDragAllowed(true);
+    } else if (isDragAllowed && contentScrollY === "ongoing") {
+      setDragAllowed(false);
+    }
+  }, [contentScrollY, isDragAllowed, setDragAllowed]);
+
   return (
     <>
       <motion.div
@@ -154,12 +165,11 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
       >
         <motion.div
           ref={sheetRef}
-          {...(draggable &&
-            fullScroll && {
-              drag: "y",
-              dragElastic: true,
-              dragPropagation: false,
-            })}
+          {...(isDragAllowed && {
+            drag: "y",
+            dragElastic: true,
+            dragPropagation: false,
+          })}
           animate={controls}
           initial={initial}
           variants={variants}
@@ -168,10 +178,15 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
             bottom: 0,
           }}
           onDrag={(event, { point }) => {
-            if (point.y <= 0) {
+            if (!draggable) {
               return;
-            } else if (foo.current.value >= foo.current.scrollHeight) {
-              setFullScroll(false);
+            }
+
+            if (point.y <= 0 && contentScrollY === "top") {
+              setDragAllowed(false);
+              return;
+            } else if (point.y >= 0 && contentScrollY === "bottom") {
+              setDragAllowed(false);
             }
           }}
           onAnimationComplete={() => {
@@ -180,7 +195,11 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
               return;
             }
 
-            setFullScroll(false); // reset scroll on element
+            (contentRef.current as HTMLElement | null)?.scroll({
+              top: 0,
+              behavior: "auto",
+            });
+
             onCloseTransitionEnd();
           }}
           onDragEnd={(event, info) => {
@@ -195,7 +214,7 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
             y: {
               type: "spring",
               stiffness: 180,
-              damping: 14,
+              damping: 18,
             },
           }}
           css={{
@@ -225,6 +244,7 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
             flexDirection: "column",
           }}
         >
+          {contentScrollY}
           <div
             ref={contentRef}
             onScroll={(event) => {
@@ -233,21 +253,21 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
                 return;
               }
 
-              const value = element.scrollTop + element.clientHeight;
-              foo.current = {
-                value,
-                scrollTop: element.scrollTop,
-                scrollHeight: element.scrollHeight,
+              const { scrollTop, clientHeight, scrollHeight } = element;
+              const fullScrollHeight = scrollTop + clientHeight;
+
+              contentScrollRef.current = {
+                fullScrollHeight,
+                scrollTop,
+                scrollHeight,
               };
-              if (
-                (element.scrollTop === 0 ||
-                  element.scrollTop + element.clientHeight >=
-                    element.scrollHeight) &&
-                !fullScroll
-              ) {
-                setFullScroll(true);
-              } else {
-                setFullScroll(false);
+
+              if (element.scrollTop === 0) {
+                setContentScrollY("top");
+              } else if (fullScrollHeight >= scrollHeight) {
+                setContentScrollY("bottom");
+              } else if (contentScrollY !== "ongoing") {
+                setContentScrollY("ongoing");
               }
             }}
             style={{
@@ -256,9 +276,8 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
               paddingTop: 24,
               paddingLeft: 24,
               paddingRight: 24,
-              maxHeight: contentDimensions.height
-                ? contentDimensions.height
-                : undefined,
+              maxHeight: (contentRef.current as HTMLElement | null)
+                ?.clientHeight,
             }}
           >
             {children}
