@@ -6,7 +6,7 @@ import {
   Variant,
 } from "framer-motion";
 import { transparentize } from "polished";
-import React, { useImperativeHandle, useEffect, useRef } from "react";
+import React, { useImperativeHandle, useEffect, useRef, useState } from "react";
 import "styled-components/macro";
 import useDimensions from "react-use-dimensions";
 
@@ -74,10 +74,19 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
     animateOnMount,
   } = { ...defaultProps, ...props };
   const firstPaint = useRef(false);
-  const [sheetRef, dimensions] = useDimensions({
+  const [fullScroll, setFullScroll] = useState(false);
+  const [sheetRef, sheetDimensions] = useDimensions({
     liveMeasure: true,
   });
-  const height = Number(dimensions.height || 0);
+  const [contentRef, contentDimensions] = useDimensions({
+    liveMeasure: true,
+  });
+  const foo = useRef({
+    scrollTop: 0,
+    scrollHeight: 0,
+    value: 0,
+  });
+  const height = Number(sheetDimensions.height || 0);
   const controls = useAnimation();
   const y = useMotionValue(0);
   const opacity = useTransform(y, [0, height], [1, 0]);
@@ -135,76 +144,127 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
           zIndex: 10, // TODO: take care of zIndexes
         }}
       />
-      <motion.div
-        ref={sheetRef}
-        {...(draggable && {
-          drag: "y",
-          dragElastic: true,
-          dragPropagation: false,
-        })}
-        animate={controls}
-        initial={initial}
-        variants={variants}
-        dragConstraints={{
-          top: 0,
-          bottom: 0,
-        }}
-        onAnimationComplete={() => {
-          if (y.get() === 0) {
-            onOpenTransitionEnd();
-            return;
-          }
-
-          onCloseTransitionEnd();
-        }}
-        onDragEnd={(event, info) => {
-          if (
-            info.velocity.y > 20 ||
-            (info.velocity.y >= 0 && info.point.y > 45)
-          ) {
-            controls.start(ANIMATIONS.hidden);
-          }
-        }}
-        transition={{
-          y: {
-            type: "spring",
-            stiffness: 180,
-            damping: 14,
-          },
-        }}
-        css={{
-          "&:after": {
-            content: "''",
-            position: "absolute",
-            height: "100vh",
-            width: "100%",
-            left: 0,
-            bottom: theme.unit.large / 2,
-            backgroundColor: theme.color.background,
-            transform: "translateY(100%) translateZ(0px)",
-          },
-        }}
+      <div
         style={{
-          y,
+          position: "fixed",
           left: 0,
           bottom: 0,
           zIndex: 11, // TODO: Take care of zIndexes
-          position: "fixed",
-          width: "100%",
-          borderBottom: "none",
-          backgroundColor: theme.color.background,
-          boxShadow: "16px 0 0 0.5",
-          borderRadius: theme.constants.radius,
         }}
       >
-        <div
+        <motion.div
+          ref={sheetRef}
+          {...(draggable &&
+            fullScroll && {
+              drag: "y",
+              dragElastic: true,
+              dragPropagation: false,
+            })}
+          animate={controls}
+          initial={initial}
+          variants={variants}
+          dragConstraints={{
+            top: 0,
+            bottom: 0,
+          }}
+          onDrag={(event, { point }) => {
+            if (point.y <= 0) {
+              return;
+            } else if (foo.current.value >= foo.current.scrollHeight) {
+              setFullScroll(false);
+            }
+          }}
+          onAnimationComplete={() => {
+            if (y.get() === 0) {
+              onOpenTransitionEnd();
+              return;
+            }
+
+            setFullScroll(false); // reset scroll on element
+            onCloseTransitionEnd();
+          }}
+          onDragEnd={(event, info) => {
+            if (
+              info.velocity.y > 20 ||
+              (info.velocity.y >= 0 && info.point.y > 45)
+            ) {
+              controls.start(ANIMATIONS.hidden);
+            }
+          }}
+          transition={{
+            y: {
+              type: "spring",
+              stiffness: 180,
+              damping: 14,
+            },
+          }}
+          css={{
+            "&:after": {
+              content: "''",
+              position: "absolute",
+              height: "100vh",
+              width: "100%",
+              left: 0,
+              bottom: theme.unit.large / 2,
+              backgroundColor: theme.color.background,
+              transform: "translateY(100%) translateZ(0px)",
+            },
+          }}
           style={{
-            overflow: "scroll",
+            y,
+            position: "relative",
+            width: "100%",
+            borderBottom: "none",
+            backgroundColor: theme.color.background,
+            boxShadow: "16px 0 0 0.5",
+            borderRadius: theme.constants.radius,
+            maxHeight: "50vh",
+            height: "50vh",
+            overflowY: "initial",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          {children}
-        </div>
-      </motion.div>
+          <div
+            ref={contentRef}
+            onScroll={(event) => {
+              const element = event.target as HTMLElement;
+              if (!draggable) {
+                return;
+              }
+
+              const value = element.scrollTop + element.clientHeight;
+              foo.current = {
+                value,
+                scrollTop: element.scrollTop,
+                scrollHeight: element.scrollHeight,
+              };
+              if (
+                (element.scrollTop === 0 ||
+                  element.scrollTop + element.clientHeight >=
+                    element.scrollHeight) &&
+                !fullScroll
+              ) {
+                setFullScroll(true);
+              } else {
+                setFullScroll(false);
+              }
+            }}
+            style={{
+              overflow: "auto",
+              height: "initial",
+              paddingTop: 24,
+              paddingLeft: 24,
+              paddingRight: 24,
+              maxHeight: contentDimensions.height
+                ? contentDimensions.height
+                : undefined,
+            }}
+          >
+            {children}
+          </div>
+        </motion.div>
+      </div>
     </>
   );
 });
