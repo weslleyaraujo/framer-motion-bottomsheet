@@ -6,7 +6,13 @@ import {
   Variant,
 } from "framer-motion";
 import { transparentize } from "polished";
-import React, { useImperativeHandle, useEffect, useRef, useState } from "react";
+import React, {
+  useImperativeHandle,
+  useEffect,
+  useRef,
+  useState,
+  useLayoutEffect,
+} from "react";
 import "styled-components/macro";
 import useDimensions from "react-use-dimensions";
 
@@ -77,18 +83,12 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
   const [contentScrollY, setContentScrollY] = useState<
     "top" | "bottom" | "ongoing"
   >("top");
-  const [isDragAllowed, setDragAllowed] = useState(true); // TODO: false
+  const [isDragAllowed, setDragAllowed] = useState(false);
   const [sheetRef, sheetDimensions] = useDimensions({
     liveMeasure: true,
   });
 
   const contentRef = useRef(null);
-  const contentScrollRef = useRef({
-    scrollTop: 0,
-    scrollHeight: 0,
-    fullScrollHeight: 0,
-  });
-
   const height = Number(sheetDimensions.height || 0);
   const controls = useAnimation();
   const y = useMotionValue(0);
@@ -124,6 +124,15 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
       controls.start(ANIMATIONS.visible);
     }
   });
+
+  useLayoutEffect(() => {
+    const element = contentRef.current as HTMLElement | null;
+    const clientHeight = Number(element?.clientHeight || 0) + 1; // why 1px off?
+    const scrollHeight = Number(element?.scrollHeight || 0);
+    if (clientHeight < scrollHeight) {
+      console.log("content needs scroll, TODO: handle drag allowed");
+    }
+  }, []);
 
   useEffect(() => {
     if (["top", "bottom"].includes(contentScrollY)) {
@@ -244,7 +253,6 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
             flexDirection: "column",
           }}
         >
-          {contentScrollY}
           <div
             ref={contentRef}
             onScroll={(event) => {
@@ -255,12 +263,6 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
 
               const { scrollTop, clientHeight, scrollHeight } = element;
               const fullScrollHeight = scrollTop + clientHeight;
-
-              contentScrollRef.current = {
-                fullScrollHeight,
-                scrollTop,
-                scrollHeight,
-              };
 
               if (element.scrollTop === 0) {
                 setContentScrollY("top");

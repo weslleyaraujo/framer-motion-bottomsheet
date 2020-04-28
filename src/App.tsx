@@ -33,7 +33,7 @@ function App() {
             </Tooltip>
           }
         />
-        {[...Array(1)].map((item, index) => {
+        {[...Array(12)].map((item, index) => {
           return (
             <p key={`thing-${index}`}>
               aliquip ex ea commodo consequat. Duis aute irure dolor in
