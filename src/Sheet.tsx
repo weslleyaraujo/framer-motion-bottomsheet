@@ -192,10 +192,13 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
             }
 
             if (point.y <= 0 && contentScrollY === "top") {
+              // TODO: consider useReducer?
               setDragAllowed(false);
+              setContentScrollY("ongoing");
               return;
             } else if (point.y >= 0 && contentScrollY === "bottom") {
               setDragAllowed(false);
+              setContentScrollY("ongoing");
             }
           }}
           onAnimationComplete={() => {
