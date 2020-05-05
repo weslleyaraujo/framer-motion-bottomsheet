@@ -6,7 +6,8 @@ import {
   Variant,
 } from "framer-motion";
 import { transparentize } from "polished";
-import React, {
+import {
+  useCallback,
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
@@ -15,6 +16,8 @@ import React, {
 } from "react";
 import useDimensions from "react-use-dimensions";
 import "styled-components/macro";
+import { createGlobalStyle } from "styled-components";
+import React from "react";
 
 type AnimationsVariants = "visible" | "hidden";
 
@@ -73,11 +76,23 @@ const defaultProps: DefaultProps = {
 interface State {
   contentScrollY: "top" | "bottom" | "inprogress";
   isDragAllowed: boolean;
+  isScrollable: boolean;
 }
 
-const reducer = (state: State, action: State["contentScrollY"]): State => ({
-  contentScrollY: action,
-  isDragAllowed: ["top", "bottom"].includes(action),
+type Action =
+  | {
+      type: "set-content-scroll-y";
+      payload: State["contentScrollY"];
+    }
+  | {
+      type: "set-is-scrollable";
+      payload: State["isScrollable"];
+    };
+
+const LockScroll = createGlobalStyle({
+  body: {
+    overflow: "hidden",
+  },
 });
 
 const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
@@ -90,9 +105,40 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
     animateOnMount,
   } = { ...defaultProps, ...props };
 
-  const [{ contentScrollY, isDragAllowed }, dispatch] = useReducer(reducer, {
+  const reducer = useCallback(
+    (state: State, action: Action): State => {
+      switch (action.type) {
+        case "set-content-scroll-y": {
+          return {
+            ...state,
+            contentScrollY: action.payload,
+            isDragAllowed: !draggable
+              ? false
+              : ["top", "bottom"].includes(action.payload),
+          };
+        }
+
+        case "set-is-scrollable": {
+          return {
+            ...state,
+            isScrollable: action.payload,
+            isDragAllowed: draggable,
+          };
+        }
+        default: {
+          return state;
+        }
+      }
+    },
+    [draggable]
+  );
+
+  const [
+    { contentScrollY, isDragAllowed, isScrollable },
+    dispatch,
+  ] = useReducer(reducer, {
     contentScrollY: "top",
-    isDragAllowed: true,
+    isDragAllowed: draggable,
   } as State);
 
   const firstPaint = useRef(false);
@@ -141,21 +187,27 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
     const element = contentRef.current as HTMLElement | null;
     const clientHeight = Number(element?.clientHeight || 0) + 1; // why 1px off?
     const scrollHeight = Number(element?.scrollHeight || 0);
-    if (clientHeight < scrollHeight) {
-      console.log("content needs scroll, TODO: handle drag allowed");
-    }
-  }, []);
+    dispatch({
+      type: "set-is-scrollable",
+      payload: clientHeight < scrollHeight,
+    });
+  }, [dispatch]);
 
   useEffect(() => {
-    if (["top", "bottom"].includes(contentScrollY)) {
-      dispatch(contentScrollY);
-    } else if (isDragAllowed && contentScrollY === "inprogress") {
-      dispatch("inprogress");
+    if (!draggable) {
+      return;
     }
-  }, [contentScrollY, isDragAllowed, dispatch]);
+
+    if (["top", "bottom"].includes(contentScrollY)) {
+      dispatch({ type: "set-content-scroll-y", payload: contentScrollY });
+    } else if (isDragAllowed && contentScrollY === "inprogress") {
+      dispatch({ type: "set-content-scroll-y", payload: "inprogress" });
+    }
+  }, [contentScrollY, isDragAllowed, dispatch, draggable]);
 
   return (
     <>
+      {y.get() === 0 && <LockScroll />}
       <motion.div
         onClick={(event) => {
           event.preventDefault();
@@ -199,7 +251,7 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
             bottom: 0,
           }}
           onDrag={(event, { point }) => {
-            if (!draggable) {
+            if (!draggable || !isScrollable) {
               return;
             }
 
@@ -207,7 +259,10 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
               (point.y <= 0 && contentScrollY === "top") ||
               (point.y >= 0 && contentScrollY === "bottom")
             ) {
-              dispatch("inprogress");
+              dispatch({
+                type: "set-content-scroll-y",
+                payload: "inprogress",
+              });
             }
           }}
           onAnimationComplete={() => {
@@ -258,8 +313,8 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
             backgroundColor: theme.color.background,
             boxShadow: "16px 0 0 0.5",
             borderRadius: theme.constants.radius,
-            maxHeight: "50vh",
-            height: "50vh",
+            maxHeight: "50vh", // TODO:
+            height: "50vh", // TODO:
             overflowY: "initial",
             display: "flex",
             flexDirection: "column",
@@ -277,11 +332,14 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
               const fullScrollHeight = scrollTop + clientHeight;
 
               if (element.scrollTop === 0) {
-                dispatch("top");
+                dispatch({ type: "set-content-scroll-y", payload: "top" });
               } else if (fullScrollHeight >= scrollHeight) {
-                dispatch("bottom");
+                dispatch({ type: "set-content-scroll-y", payload: "bottom" });
               } else if (contentScrollY !== "inprogress") {
-                dispatch("inprogress");
+                dispatch({
+                  type: "set-content-scroll-y",
+                  payload: "inprogress",
+                });
               }
             }}
             style={{
@@ -290,6 +348,9 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
               paddingTop: 24,
               paddingLeft: 24,
               paddingRight: 24,
+              paddingBottom: 24, // TODO: handle padding as prop + safe inset area
+              position: "relative",
+              zIndex: 12, // TODO: handle z-indexes
               maxHeight: (contentRef.current as HTMLElement | null)
                 ?.clientHeight,
             }}
