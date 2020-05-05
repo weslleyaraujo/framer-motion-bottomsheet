@@ -7,14 +7,14 @@ import {
 } from "framer-motion";
 import { transparentize } from "polished";
 import React, {
-  useImperativeHandle,
   useEffect,
-  useRef,
-  useState,
+  useImperativeHandle,
   useLayoutEffect,
+  useReducer,
+  useRef,
 } from "react";
-import "styled-components/macro";
 import useDimensions from "react-use-dimensions";
+import "styled-components/macro";
 
 type AnimationsVariants = "visible" | "hidden";
 
@@ -70,6 +70,16 @@ const defaultProps: DefaultProps = {
   onOpenTransitionEnd: () => {},
 };
 
+interface State {
+  contentScrollY: "top" | "bottom" | "inprogress";
+  isDragAllowed: boolean;
+}
+
+const reducer = (state: State, action: State["contentScrollY"]): State => ({
+  contentScrollY: action,
+  isDragAllowed: ["top", "bottom"].includes(action),
+});
+
 const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
   const {
     initial: rawInitial,
@@ -79,11 +89,13 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
     onOpenTransitionEnd,
     animateOnMount,
   } = { ...defaultProps, ...props };
+
+  const [{ contentScrollY, isDragAllowed }, dispatch] = useReducer(reducer, {
+    contentScrollY: "top",
+    isDragAllowed: true,
+  } as State);
+
   const firstPaint = useRef(false);
-  const [contentScrollY, setContentScrollY] = useState<
-    "top" | "bottom" | "ongoing"
-  >("top");
-  const [isDragAllowed, setDragAllowed] = useState(false);
   const [sheetRef, sheetDimensions] = useDimensions({
     liveMeasure: true,
   });
@@ -136,11 +148,11 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
 
   useEffect(() => {
     if (["top", "bottom"].includes(contentScrollY)) {
-      setDragAllowed(true);
-    } else if (isDragAllowed && contentScrollY === "ongoing") {
-      setDragAllowed(false);
+      dispatch(contentScrollY);
+    } else if (isDragAllowed && contentScrollY === "inprogress") {
+      dispatch("inprogress");
     }
-  }, [contentScrollY, isDragAllowed, setDragAllowed]);
+  }, [contentScrollY, isDragAllowed, dispatch]);
 
   return (
     <>
@@ -191,14 +203,11 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
               return;
             }
 
-            if (point.y <= 0 && contentScrollY === "top") {
-              // TODO: consider useReducer?
-              setDragAllowed(false);
-              setContentScrollY("ongoing");
-              return;
-            } else if (point.y >= 0 && contentScrollY === "bottom") {
-              setDragAllowed(false);
-              setContentScrollY("ongoing");
+            if (
+              (point.y <= 0 && contentScrollY === "top") ||
+              (point.y >= 0 && contentScrollY === "bottom")
+            ) {
+              dispatch("inprogress");
             }
           }}
           onAnimationComplete={() => {
@@ -268,11 +277,11 @@ const Sheet = React.forwardRef<SheetRef, Props>(function Sheet(props, ref) {
               const fullScrollHeight = scrollTop + clientHeight;
 
               if (element.scrollTop === 0) {
-                setContentScrollY("top");
+                dispatch("top");
               } else if (fullScrollHeight >= scrollHeight) {
-                setContentScrollY("bottom");
-              } else if (contentScrollY !== "ongoing") {
-                setContentScrollY("ongoing");
+                dispatch("bottom");
+              } else if (contentScrollY !== "inprogress") {
+                dispatch("inprogress");
               }
             }}
             style={{
